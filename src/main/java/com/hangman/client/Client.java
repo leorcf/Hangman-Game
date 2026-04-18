@@ -25,6 +25,7 @@ public class Client {
     private static volatile int myId          = 0;
     private static volatile int totalPlayers  = 0;
     private static volatile int currentRound  = 0;
+    private static volatile int activePlayerId = 0;
     private static volatile String mask       = "";
     private static volatile int attempts      = 0;
     private static volatile int maxAttempts   = Protocol.MAX_ATTEMPTS;
@@ -88,8 +89,10 @@ public class Client {
             String[] p = msg.split(" ");
             waitingForGuess = false;
             currentRound = 0;
+            activePlayerId = 0;
             mask = p[1];
             attempts = Integer.parseInt(p[2]);
+            totalPlayers = Integer.parseInt(p[3]);
             usedLetters = "-";
             clearScreen();
             printGameBoard("JOGO INICIADO!", YELLOW);
@@ -97,23 +100,30 @@ public class Client {
         } else if (msg.startsWith(Protocol.ROUND)) {
             String[] p = msg.split(" ");
             currentRound = Integer.parseInt(p[1]);
-            mask         = p[2];
-            attempts     = Integer.parseInt(p[3]);
-            usedLetters  = p[4];
+            activePlayerId = Integer.parseInt(p[2]);
+            mask           = p[3];
+            attempts       = Integer.parseInt(p[4]);
+            usedLetters    = p[5];
 
             clearScreen();
-            printGameBoard("Ronda " + currentRound, CYAN);
-            waitingForGuess = true;
-            askGuess();
+            waitingForGuess = activePlayerId == myId;
+            if (waitingForGuess) {
+                printGameBoard("Ronda " + currentRound + " - A tua vez", CYAN);
+                askGuess();
+            } else {
+                printGameBoard("Ronda " + currentRound, CYAN);
+                printWaitingForPlayer(activePlayerId);
+            }
 
         } else if (msg.startsWith(Protocol.STATE)) {
             String[] p = msg.split(" ");
             waitingForGuess = false;
+            activePlayerId = 0;
             mask        = p[1];
             attempts    = Integer.parseInt(p[2]);
             usedLetters = p[3];
             clearScreen();
-            printGameBoard("A aguardar outros jogadores...", GRAY);
+            printGameBoard("A preparar próximo turno...", GRAY);
 
         } else if (msg.startsWith(Protocol.CANCEL)) {
             waitingForGuess = false;
@@ -127,14 +137,21 @@ public class Client {
             String[] p = msg.split(" ");
             waitingForGuess = false;
             running = false;
+            activePlayerId = 0;
+            String winnerId = p[2];
             mask = p[3];
             clearScreen();
-            printWin(p[2], p[3]);
+            if (Integer.parseInt(winnerId) == myId) {
+                printWin(p[3]);
+            } else {
+                printLoseToWinner(winnerId, p[3]);
+            }
 
         } else if (msg.startsWith(Protocol.END_LOSE)) {
             String[] p = msg.split(" ");
             waitingForGuess = false;
             running = false;
+            activePlayerId = 0;
             clearScreen();
             printLose(p[2]);
         }
@@ -203,6 +220,7 @@ public class Client {
 
         // Info do jogador
         System.out.printf("  ║  %-40s║%n", GRAY + "Jogador:  #" + myId + " de " + totalPlayers + WHITE);
+        System.out.printf("  ║  %-40s║%n", GRAY + "Vez:      " + buildTurnLabel() + WHITE);
 
         System.out.println("  ╚══════════════════════════════════════════╝");
         System.out.println(RESET);
@@ -239,12 +257,23 @@ public class Client {
     }
 
     // ── Ecrã de vitória ─────────────────────────────────────────────────────
-    private static void printWin(String winnerIds, String word) {
+    private static void printWin(String word) {
         System.out.println(BOLD + GREEN);
         System.out.println("  ╔══════════════════════════════════════════╗");
         System.out.println("  ║         🎉  VITÓRIA!  🎉                 ║");
         System.out.println("  ╠══════════════════════════════════════════╣");
-        System.out.printf ("  ║  %-41s║%n", " Vencedores: Jogador(es) #" + winnerIds);
+        System.out.printf ("  ║  %-41s║%n", " Vencedor: Jogador #" + myId);
+        System.out.printf ("  ║  %-41s║%n", " Palavra: " + word.toUpperCase());
+        System.out.println("  ╚══════════════════════════════════════════╝");
+        System.out.println(RESET);
+    }
+
+    private static void printLoseToWinner(String winnerId, String word) {
+        System.out.println(BOLD + RED);
+        System.out.println("  ╔══════════════════════════════════════════╗");
+        System.out.println("  ║            FIM DE JOGO                  ║");
+        System.out.println("  ╠══════════════════════════════════════════╣");
+        System.out.printf ("  ║  %-41s║%n", " Venceu o Jogador #" + winnerId);
         System.out.printf ("  ║  %-41s║%n", " Palavra: " + word.toUpperCase());
         System.out.println("  ╚══════════════════════════════════════════╝");
         System.out.println(RESET);
@@ -259,6 +288,16 @@ public class Client {
         System.out.printf ("  ║  %-41s║%n", " A palavra era: " + word.toUpperCase());
         System.out.println("  ╚══════════════════════════════════════════╝");
         System.out.println(RESET);
+    }
+
+    private static void printWaitingForPlayer(int playerId) {
+        System.out.println(GRAY + "  Vez do Jogador #" + playerId + ". Aguarda pela jogada..." + RESET);
+    }
+
+    private static String buildTurnLabel() {
+        if (activePlayerId == 0) return "A aguardar";
+        if (activePlayerId == myId) return "A tua vez";
+        return "Jogador #" + activePlayerId;
     }
 
     private static void printCancel(String reason) {

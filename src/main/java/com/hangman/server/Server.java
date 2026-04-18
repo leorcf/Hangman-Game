@@ -8,10 +8,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -122,60 +119,58 @@ public class Server {
 
         broadcast(Protocol.START + " " + gameManager.getMask()
                 + " " + gameManager.getAttemptsLeft()
-                + " " + Protocol.ROUND_TIMEOUT_MS);
+                + " " + players.size());
 
         new Thread(this::runGame, "game-loop").start();
     }
 
     private void runGame() {
         int round = 1;
+        int currentTurnIndex = 0;
 
         while (!gameManager.isGameOver()) {
             pruneDisconnectedPlayers();
             if (players.isEmpty()) break;
 
+            currentTurnIndex = normalizeTurnIndex(currentTurnIndex);
+            ClientHandler activePlayer = players.get(currentTurnIndex);
             int currentRound = round;
 
             broadcast(Protocol.ROUND + " " + currentRound
+                    + " " + activePlayer.getPlayerId()
                     + " " + gameManager.getMask()
                     + " " + gameManager.getAttemptsLeft()
                     + " " + gameManager.getUsedLetters());
+            System.out.println("[Server] Ronda " + currentRound + " - vez do Jogador " + activePlayer.getPlayerId() + ".");
 
-            List<Thread> threads = new ArrayList<>();
-            Map<Integer, String> guesses = new ConcurrentHashMap<>();
-
-            for (ClientHandler player : players) {
-                Thread t = new Thread(() -> {
-                    String guess = player.collectGuess(currentRound);
-                    guesses.put(player.getPlayerId(), guess);
-                }, "guess-" + player.getPlayerId() + "-r" + currentRound);
-                threads.add(t);
-                t.start();
-            }
-
-            for (Thread t : threads) {
-                try {
-                    t.join();
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                }
-            }
+            String guess = activePlayer.collectGuess(currentRound);
 
             pruneDisconnectedPlayers();
             if (players.isEmpty()) break;
 
-            boolean anyProgress = false;
-            for (ClientHandler player : players) {
-                String guess = guesses.getOrDefault(player.getPlayerId(), "");
-                boolean progress = gameManager.processGuess(player.getPlayerId(), guess);
-                if (progress) anyProgress = true;
+            if (!players.contains(activePlayer)) {
+                currentTurnIndex = normalizeTurnIndex(currentTurnIndex);
+                continue;
             }
 
-            if (!anyProgress) gameManager.consumeAttempt();
+            boolean progress = gameManager.processGuess(activePlayer.getPlayerId(), guess);
+            if (!progress) {
+                gameManager.consumeAttempt();
+            }
+            logPlayerAction(activePlayer.getPlayerId(), guess, progress);
 
             broadcast(Protocol.STATE + " " + gameManager.getMask()
                     + " " + gameManager.getAttemptsLeft()
                     + " " + gameManager.getUsedLetters());
+
+            if (gameManager.isGameOver()) break;
+
+            int activeIndex = players.indexOf(activePlayer);
+            if (activeIndex == -1) {
+                currentTurnIndex = normalizeTurnIndex(currentTurnIndex);
+            } else {
+                currentTurnIndex = (activeIndex + 1) % players.size();
+            }
 
             round++;
         }
@@ -197,12 +192,9 @@ public class Server {
         pruneDisconnectedPlayers();
 
         if (!players.isEmpty()) {
-            List<Integer> winners = gameManager.getWinnerIds();
-            if (!winners.isEmpty()) {
-                StringBuilder ids = new StringBuilder();
-                for (int id : winners) ids.append(id).append(',');
-                ids.deleteCharAt(ids.length() - 1);
-                broadcast(Protocol.END_WIN + " " + ids + " " + gameManager.getWord());
+            Integer winnerId = gameManager.getWinnerId();
+            if (winnerId != null) {
+                broadcast(Protocol.END_WIN + " " + winnerId + " " + gameManager.getWord());
             } else {
                 broadcast(Protocol.END_LOSE + " " + gameManager.getWord());
             }
@@ -238,5 +230,21 @@ public class Server {
                 players.remove(player);
             }
         }
+    }
+
+    private int normalizeTurnIndex(int currentTurnIndex) {
+        if (players.isEmpty()) return 0;
+        return currentTurnIndex % players.size();
+    }
+
+    private void logPlayerAction(int playerId, String guess, boolean progress) {
+        if (guess == null || guess.isBlank()) {
+            System.out.println("[Server] Jogador " + playerId + ": sem resposta (timeout).");
+            return;
+        }
+
+        String normalizedGuess = guess.trim().toUpperCase();
+        String outcome = progress ? "acertou" : "falhou";
+        System.out.println("[Server] Jogador " + playerId + ": " + normalizedGuess + " -> " + outcome + ".");
     }
 }
