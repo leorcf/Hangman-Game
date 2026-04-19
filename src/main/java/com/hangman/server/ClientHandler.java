@@ -41,7 +41,6 @@ public class ClientHandler implements Runnable {
         }
     }
 
-    // Envia mensagem ao cliente
     public synchronized boolean send(String message) {
         if (closed || out == null) return false;
 
@@ -54,7 +53,6 @@ public class ClientHandler implements Runnable {
         return true;
     }
 
-    // Recolhe a jogada do cliente com timeout
     public String collectGuess(int expectedRound) {
         if (closed || in == null) return "";
 

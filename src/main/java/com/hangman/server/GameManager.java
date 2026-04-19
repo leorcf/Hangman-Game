@@ -21,7 +21,6 @@ public class GameManager {
         Arrays.fill(mask, '_');
     }
 
-    // Processa a jogada de um jogador; devolve true se revelou letras ou acertou na palavra.
     public synchronized boolean processGuess(int playerId, String guess) {
         if (guess == null || guess.isBlank() || isGameOver()) return false;
 

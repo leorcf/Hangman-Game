@@ -7,9 +7,13 @@ import java.net.ConnectException;
 import java.net.Socket;
 import java.util.Scanner;
 
+/*
+    Para integrar o ASCII na interface e obter um resultado mais bonito,
+    recorremos ao uso da inteligência artificial.
+*/
+
 public class Client {
 
-    // ── Cores ANSI ──────────────────────────────────────────────────────────
     private static final String RESET   = "\u001B[0m";
     private static final String BOLD    = "\u001B[1m";
     private static final String RED     = "\u001B[31m";
@@ -19,7 +23,6 @@ public class Client {
     private static final String WHITE   = "\u001B[37m";
     private static final String GRAY    = "\u001B[90m";
 
-    // ── Estado do jogo (atualizado a cada mensagem) ──────────────────────────
     private static final Object SEND_LOCK = new Object();
 
     private static volatile int myId          = 0;
@@ -63,7 +66,6 @@ public class Client {
         }
     }
 
-    // ── Handler de mensagens ─────────────────────────────────────────────────
     private static void handleMessage(String msg) {
         if (msg.startsWith(Protocol.FULL)) {
             waitingForGuess = false;
@@ -157,7 +159,6 @@ public class Client {
         }
     }
 
-    // ── Pede jogada ao utilizador ────────────────────────────────────────────
     private static void askGuess() {
         System.out.println();
         System.out.print(BOLD + YELLOW + "  ➤ A tua jogada (letra ou palavra): " + RESET);
@@ -191,14 +192,12 @@ public class Client {
         inputThread.start();
     }
 
-    // ── Ecrã principal do jogo ───────────────────────────────────────────────
     private static void printGameBoard(String title, String titleColor) {
         System.out.println(BOLD + WHITE);
         System.out.println("  ╔══════════════════════════════════════════╗");
         System.out.printf ("  ║  %-40s║%n", titleColor + title + WHITE);
         System.out.println("  ╠══════════════════════════════════════════╣");
 
-        // Forca ASCII
         String[] gallows = buildGallows(maxAttempts - attempts);
         for (String row : gallows) {
             System.out.printf("  ║  %-40s║%n", row);
@@ -206,19 +205,15 @@ public class Client {
 
         System.out.println("  ╠══════════════════════════════════════════╣");
 
-        // Palavra com espaços entre letras
         String displayMask = mask.replace("", " ").trim().toUpperCase();
         System.out.printf("  ║  %-40s║%n", CYAN + "Palavra:  " + BOLD + displayMask + WHITE);
 
-        // Barra de tentativas
         String bar = buildAttemptsBar(attempts, maxAttempts);
         System.out.printf("  ║  %-40s║%n", "Vidas:    " + bar);
 
-        // Letras usadas
         String letras = usedLetters.equals("-") ? "nenhuma" : usedLetters.toUpperCase();
         System.out.printf("  ║  %-40s║%n", GRAY + "Letras:   " + letras + WHITE);
 
-        // Info do jogador
         System.out.printf("  ║  %-40s║%n", GRAY + "Jogador:  #" + myId + " de " + totalPlayers + WHITE);
         System.out.printf("  ║  %-40s║%n", GRAY + "Vez:      " + buildTurnLabel() + WHITE);
 
@@ -226,7 +221,6 @@ public class Client {
         System.out.println(RESET);
     }
 
-    // ── Forca ASCII por nível de erros ──────────────────────────────────────
     private static String[] buildGallows(int errors) {
         String head  = errors >= 1 ? RED + "O" + WHITE : " ";
         String body  = errors >= 2 ? RED + "|" + WHITE : " ";
@@ -246,7 +240,6 @@ public class Client {
         };
     }
 
-    // ── Barra de tentativas ──────────────────────────────────────────────────
     private static String buildAttemptsBar(int left, int max) {
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < max; i++) {
@@ -256,11 +249,10 @@ public class Client {
         return sb.toString();
     }
 
-    // ── Ecrã de vitória ─────────────────────────────────────────────────────
     private static void printWin(String word) {
         System.out.println(BOLD + GREEN);
         System.out.println("  ╔══════════════════════════════════════════╗");
-        System.out.println("  ║         🎉  VITÓRIA!  🎉                 ║");
+        System.out.println("  ║             VITÓRIA!                     ║");
         System.out.println("  ╠══════════════════════════════════════════╣");
         System.out.printf ("  ║  %-41s║%n", " Vencedor: Jogador #" + myId);
         System.out.printf ("  ║  %-41s║%n", " Palavra: " + word.toUpperCase());
@@ -271,7 +263,7 @@ public class Client {
     private static void printLoseToWinner(String winnerId, String word) {
         System.out.println(BOLD + RED);
         System.out.println("  ╔══════════════════════════════════════════╗");
-        System.out.println("  ║            FIM DE JOGO                  ║");
+        System.out.println("  ║            FIM DE JOGO                   ║");
         System.out.println("  ╠══════════════════════════════════════════╣");
         System.out.printf ("  ║  %-41s║%n", " Venceu o Jogador #" + winnerId);
         System.out.printf ("  ║  %-41s║%n", " Palavra: " + word.toUpperCase());
@@ -279,11 +271,10 @@ public class Client {
         System.out.println(RESET);
     }
 
-    // ── Ecrã de derrota ─────────────────────────────────────────────────────
     private static void printLose(String word) {
         System.out.println(BOLD + RED);
         System.out.println("  ╔══════════════════════════════════════════╗");
-        System.out.println("  ║         💀  DERROTA!  💀                 ║");
+        System.out.println("  ║             DERROTA!                     ║");
         System.out.println("  ╠══════════════════════════════════════════╣");
         System.out.printf ("  ║  %-41s║%n", " A palavra era: " + word.toUpperCase());
         System.out.println("  ╚══════════════════════════════════════════╝");
@@ -303,14 +294,13 @@ public class Client {
     private static void printCancel(String reason) {
         System.out.println(BOLD + YELLOW);
         System.out.println("  ╔══════════════════════════════════════════╗");
-        System.out.println("  ║          JOGO CANCELADO                 ║");
+        System.out.println("  ║          JOGO CANCELADO                  ║");
         System.out.println("  ╠══════════════════════════════════════════╣");
         System.out.printf ("  ║  %-41s║%n", " " + reason);
         System.out.println("  ╚══════════════════════════════════════════╝");
         System.out.println(RESET);
     }
 
-    // ── Banner inicial ───────────────────────────────────────────────────────
     private static void printBanner() {
         System.out.println(BOLD + CYAN);
         System.out.println("  ██╗  ██╗ █████╗ ███╗  ██╗ ██████╗ ███╗  ███╗ █████╗ ███╗  ██╗");
@@ -323,7 +313,6 @@ public class Client {
         System.out.println(RESET);
     }
 
-    // ── Limpa o ecrã ────────────────────────────────────────────────────────
     private static void clearScreen() {
         System.out.print("\033[H\033[2J");
         System.out.flush();
